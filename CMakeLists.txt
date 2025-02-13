@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
-project(project_name 
+project(GraphicsSandbox
     VERSION 0.1.0
-    DESCRIPTION "Project description"
+    DESCRIPTION "Graphics sandbox"
     LANGUAGES CXX
 )
 
@@ -12,7 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Compilation flags
 if(MSVC)
-    add_compile_options(/W4)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()

@@ -2,9 +2,12 @@
 build/
 bin/
 lib/
+external/*/
+
 
 # IDE specific files
 .vscode/
+.vs/
 .idea/
 *.swp
 *.swo
