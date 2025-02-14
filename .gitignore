@@ -30,3 +30,7 @@ Makefile
 # OS specific
 .DS_Store
 Thumbs.db
+
+
+#other
+assets/
