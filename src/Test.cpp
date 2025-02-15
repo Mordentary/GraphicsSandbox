@@ -60,8 +60,12 @@ void BasicApp::draw()
 	gl::color(1.0f, 0.5f, 0.25f);
 	gl::setMatrices(mCamera);
 
-	m_Texture->bind();
-	m_Batch->draw();
+	m_GLSLProg->bind();
+	vec3 billboardPos(0.0f, 1.0f, 0.0f);
+	vec2 billboardSize(1.0f, 1.0f);
+	vec3 right, up;
+	mCamera.getBillboardVectors(&right, &up);
+	gl::drawBillboard(mCamera.getEyePoint() + vec3(0, 0, -3), vec3(100.0f), 0, right, up);
 	mFbo->unbindFramebuffer();
 
 	gl::clear();
@@ -81,25 +85,24 @@ void BasicApp::update()
 	forward.z = -cos(mPitch) * cos(mYaw);
 	forward = normalize(forward);
 
-	// Compute the right vector as the cross product of forward and world up.
 	vec3 right = normalize(cross(forward, vec3(0, 1, 0)));
 
-	// Determine movement direction based on key presses.
 	vec3 movement(0);
 	if (mKeyW) movement += forward;
 	if (mKeyS) movement -= forward;
 	if (mKeyD) movement += right;
 	if (mKeyA) movement -= right;
 
-	// Normalize movement to prevent faster diagonal motion.
 	if (glm::length(movement) > 0)
 		movement = normalize(movement);
 
-	// Update camera position with movement scaled by speed and elapsed time.
 	mCameraPos += movement * mSpeed * dt;
 
-	// Update the camera's view matrix.
 	mCamera.lookAt(mCameraPos, mCameraPos + forward, vec3(0, 1, 0));
+
+	m_GLSLProg->uniform("iCameraPos", mCamera.getEyePoint());
+	m_GLSLProg->uniform("iResolution", vec2(getWindowWidth(), getWindowHeight()));
+	m_GLSLProg->uniform("iTime", static_cast<float>(getElapsedSeconds()));
 }
 
 void BasicApp::setup()
@@ -109,7 +112,7 @@ void BasicApp::setup()
 	mPitch = 0.0f;
 	mKeyW = mKeyA = mKeyS = mKeyD = false;
 	mSpeed = 5.0f;
-	mCamera.setPerspective(70.0f, getWindowAspectRatio(), 0.1f, 100.0f);
+	mCamera.setPerspective(90.0f, getWindowAspectRatio(), 0.000001f, 100.0f);
 	mCamera.lookAt(mCameraPos, mCameraPos + vec3(0, 0, -1), vec3(0, 1, 0));
 
 	mLastTime = getElapsedSeconds();
@@ -123,13 +126,17 @@ void BasicApp::setup()
 	}
 
 	CI_ASSERT(m_Texture, "Texture is not here!");
-	m_GLSLProg = gl::GlslProg::create(loadAsset("shaders/shader.vert"), loadAsset("shaders/shader.frag"));
-	m_Batch = gl::Batch::create(geom::Torus(), m_GLSLProg);
-	gl::enableFaceCulling(true);
+	m_GLSLProg = gl::GlslProg::create(loadAsset("shaders/rayMarching.vert"), loadAsset("shaders/rayMarching.frag"));
+
+	//m_Batch = gl::Batch::create(geom::bil(), m_GLSLProg);
+	gl::enableFaceCulling(false);
+	gl::enableDepthRead();
+	gl::enableDepthWrite();
 	gl::Fbo::Format fboFormat;
 	fboFormat.setColorTextureFormat(gl::Texture2d::Format().internalFormat(GL_RGBA8));
 	fboFormat.enableDepthBuffer(true);
 	mFbo = gl::Fbo::create(getWindowWidth(), getWindowHeight(), fboFormat);
+	mBillboard = std::make_unique<Billboard>();
 
 	if (!mFbo)
 		CI_LOG_E("FBO is incomplete!");
@@ -141,11 +148,9 @@ void prepareSettings(BasicApp::Settings* settings)
 	ivec2 windowSize(2560, 1440);
 	settings->setWindowSize(windowSize);
 
-	// Get the bounds of the primary display
 	auto display = Display::getMainDisplay();
 	Area bounds = display->getBounds();
 
-	// Calculate centered position
 	int posX = bounds.getWidth() / 2 - windowSize.x / 2;
 	int posY = bounds.getHeight() / 2 - windowSize.y / 2;
 	settings->setWindowPos(ivec2(posX, posY));

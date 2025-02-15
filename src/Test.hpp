@@ -3,10 +3,11 @@
 #include "cinder/app/RendererGl.h"
 #include "cinder/Log.h"
 #include "cinder/gl/gl.h"
-
+#include "billboard.hpp"
 using namespace ci;
 using namespace ci::app;
 
+class Billboard;
 class BasicApp : public App
 {
 public:
@@ -24,6 +25,7 @@ private:
 	gl::TextureRef		m_Texture;
 	gl::GlslProgRef		m_GLSLProg;
 	glm::mat4			m_CubeRotationMat;
+	std::unique_ptr<Billboard> mBillboard;
 
 	CameraPersp mCamera;
 	vec3        mCameraPos;
