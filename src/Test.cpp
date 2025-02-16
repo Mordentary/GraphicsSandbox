@@ -65,7 +65,8 @@ void BasicApp::draw()
 	vec2 billboardSize(1.0f, 1.0f);
 	vec3 right, up;
 	mCamera.getBillboardVectors(&right, &up);
-	gl::drawBillboard(mCamera.getEyePoint() + vec3(0, 0, -3), vec3(100.0f), 0, right, up);
+	gl::drawBillboard((mCamera.getViewDirection()) + mCameraPos, vec3(2.0f), 0, right, up);
+
 	mFbo->unbindFramebuffer();
 
 	gl::clear();
@@ -101,6 +102,9 @@ void BasicApp::update()
 	mCamera.lookAt(mCameraPos, mCameraPos + forward, vec3(0, 1, 0));
 
 	m_GLSLProg->uniform("iCameraPos", mCamera.getEyePoint());
+	m_GLSLProg->uniform("iCameraInvView", mCamera.getInverseViewMatrix());
+	m_GLSLProg->uniform("iCameraInvProj", glm::inverse(mCamera.getProjectionMatrix()));
+
 	m_GLSLProg->uniform("iResolution", vec2(getWindowWidth(), getWindowHeight()));
 	m_GLSLProg->uniform("iTime", static_cast<float>(getElapsedSeconds()));
 }

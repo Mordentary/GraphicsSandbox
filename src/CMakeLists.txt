@@ -19,6 +19,14 @@ target_include_directories(${PROJECT_NAME}
         ${PROJECT_SOURCE_DIR}/src
 )
 
+# Post-build command to copy the assets folder
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
+    COMMENT "Copying assets folder to output directory..."
+)
+
 # Install the target executable to the bin directory
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin

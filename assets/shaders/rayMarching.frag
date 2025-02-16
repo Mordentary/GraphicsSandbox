@@ -2,16 +2,24 @@
 
 out vec4 FragColor;
 in vec2 vTexCoord;
+
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec3 iCameraPos;
+uniform mat4 iCameraInvView;   
+uniform mat4 iCameraInvProj;  
 
 const int MAX_STEPS = 100;
-const float MIN_DIST = 0.001;
+const float MIN_DIST = 0.00001;
 const float MAX_DIST = 100.0;
 const float EPSILON = 0.001;
 
-// Primitive SDFs
+float smoothMin(float d1, float d2, float k) {
+    float h = clamp(0.5 + 0.5*(d2 - d1)/k, 0.0, 1.0);
+    return mix(d2, d1, h) - k*h*(1.0 - h);
+}
+
+// --- SDF functions for scene primitives ---
 float sphereSDF(vec3 p, vec3 center, float radius) {
     return length(p - center) - radius;
 }
@@ -27,6 +35,7 @@ float torusSDF(vec3 p, vec3 center, float radius, float thickness) {
     return length(q) - thickness;
 }
 
+// --- Scene SDF ---
 float sceneSDF(vec3 p) {
     // Ground plane
     float ground = p.y + 1.0;
@@ -44,15 +53,15 @@ float sceneSDF(vec3 p) {
     // Torus
     float torus = torusSDF(p, vec3(0.0, 0.0, 0.0), 2.0, 0.5);
     
-    // Combine all objects using smooth min
-    float scene = min(ground, sphere1);
-    scene = min(scene, sphere2);
-    scene = min(scene, box);
-    scene = min(scene, torus);
+    float scene = smoothMin(ground, sphere1, 0.5f);
+    scene = smoothMin(scene, sphere2, 0.5f);
+    scene = smoothMin(scene, box, 0.5f);
+    scene = smoothMin(scene, torus, 0.5f);
     
     return scene;
 }
 
+// --- Estimate normal at point p ---
 vec3 estimateNormal(vec3 p) {
     return normalize(vec3(
         sceneSDF(vec3(p.x + EPSILON, p.y, p.z)) - sceneSDF(vec3(p.x - EPSILON, p.y, p.z)),
@@ -61,54 +70,49 @@ vec3 estimateNormal(vec3 p) {
     ));
 }
 
+// --- Raymarching ---
 float rayMarch(vec3 ro, vec3 rd) {
     float totalDist = 0.0;
-    
     for (int i = 0; i < MAX_STEPS; i++) {
         vec3 p = ro + totalDist * rd;
         float dist = sceneSDF(p);
-        
         if (dist < MIN_DIST) {
             return totalDist;
         }
-        
         totalDist += dist;
-        
         if (totalDist > MAX_DIST) {
             return MAX_DIST;
         }
     }
-    
     return MAX_DIST;
 }
 
+// --- Lighting calculation ---
 vec3 calculateLighting(vec3 p, vec3 normal) {
     vec3 lightPos = vec3(5.0, 5.0, 5.0);
     vec3 lightDir = normalize(lightPos - p);
     
-    // Ambient
+    // Ambient lighting
     float ambient = 0.1;
     
-    // Diffuse
+    // Diffuse lighting
     float diff = max(dot(normal, lightDir), 0.0);
     
-    // Specular
+    // Specular lighting
     vec3 viewDir = normalize(iCameraPos - p);
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
     
-    // Shadow ray marching
+    // Simple shadow computation
     float shadow = 1.0;
     vec3 shadowRayStart = p + normal * MIN_DIST * 2.0;
     float distToLight = length(lightPos - shadowRayStart);
-    vec3 shadowRayDir = lightDir;
-    
-    float shadowDist = rayMarch(shadowRayStart, shadowRayDir);
+    float shadowDist = rayMarch(shadowRayStart, lightDir);
     if (shadowDist < distToLight) {
         shadow = 0.2;
     }
     
-    // Material colors based on position
+    // Determine object color based on position
     vec3 color;
     if (p.y < -0.9) { // Ground
         color = vec3(0.2, 0.3, 0.4);
@@ -128,10 +132,19 @@ vec3 calculateLighting(vec3 p, vec3 normal) {
 void main() {
     vec2 uv = (gl_FragCoord.xy * 2.0 - iResolution.xy) / min(iResolution.x, iResolution.y);
     
-    // Camera setup
-    vec3 ro = vec3(0.0, 2.0, 6.0);
-    vec3 rd = normalize(vec3(uv, -1.5));
+    vec3 ro = iCameraPos;
     
+    vec4 rayClip = vec4(uv, -1.0, 1.0);
+    
+    // Transform clip-space position into view space using the inverse projection matrix
+    vec4 rayEye = iCameraInvProj * rayClip;
+    // Force the ray direction (we want a direction vector, not a position)
+    rayEye = vec4(rayEye.xy, -1.0, 0.0);
+    
+    // Transform from view space to world space using the inverse view matrix
+    vec3 rd = normalize((iCameraInvView * rayEye).xyz);
+    
+    // --- Raymarching ---
     float dist = rayMarch(ro, rd);
     vec3 color;
     
@@ -140,11 +153,11 @@ void main() {
         vec3 normal = estimateNormal(p);
         color = calculateLighting(p, normal);
     } else {
-        // Sky gradient
-        color = mix(vec3(0.5, 0.7, 1.0), vec3(0.2, 0.3, 0.5), uv.y * 0.5 + 0.5);
+        // Background (sky gradient)
+//        color = mix(vec3(0.5, 0.7, 1.0), vec3(0.2, 0.3, 0.5), uv.y * 0.5 + 0.5);
     }
     
-    // Basic tone mapping
+    // Simple tone mapping
     color = color / (color + vec3(1.0));
     
     FragColor = vec4(color, 1.0);
