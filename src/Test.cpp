@@ -61,11 +61,9 @@ void BasicApp::draw()
 	gl::setMatrices(mCamera);
 
 	m_GLSLProg->bind();
-	vec3 billboardPos(0.0f, 1.0f, 0.0f);
-	vec2 billboardSize(1.0f, 1.0f);
 	vec3 right, up;
 	mCamera.getBillboardVectors(&right, &up);
-	gl::drawBillboard((mCamera.getViewDirection()) + mCameraPos, vec3(2.0f), 0, right, up);
+	gl::drawBillboard((mCamera.getViewDirection()) + mCameraPos, vec3(4.0f), 0, right, up);
 
 	mFbo->unbindFramebuffer();
 
@@ -149,6 +147,8 @@ void BasicApp::setup()
 void prepareSettings(BasicApp::Settings* settings)
 {
 	settings->setMultiTouchEnabled(false);
+	settings->setConsoleWindowEnabled(true);
+
 	ivec2 windowSize(2560, 1440);
 	settings->setWindowSize(windowSize);
 
